@@ -249,6 +249,18 @@ CLASS zcl_2ui5_hlp_utility DEFINITION
       RETURNING
         VALUE(r_result) TYPE xstring.
 
+    CLASS-METHODS hlp_get_abap_as_json
+      IMPORTING
+        i_mo_app_row2_abap TYPE any
+      RETURNING
+        VALUE(r_result)    TYPE string.
+
+    CLASS-METHODS hlp_get_json_as_abap
+      IMPORTING
+        i_mo_app_row2_abap TYPE REF TO data
+      CHANGING
+        co_data            TYPE data.
+
     CLASS-METHODS conv_xstring_2_string
       IMPORTING
         iv_xstring      TYPE xstring
@@ -519,6 +531,112 @@ CLASS zcl_2ui5_hlp_utility IMPLEMENTATION.
        SOURCE data = object "i_result->ms_db-data
        RESULT XML result.
     "i_result->mi_object.
+
+
+  ENDMETHOD.
+
+
+  METHOD hlp_get_json_as_abap.
+
+
+    DATA(o_type_desc) = cl_abap_typedescr=>describe_by_data( co_data ).
+
+    CASE o_type_desc->kind.
+      WHEN cl_abap_typedescr=>kind_struct.
+
+      WHEN cl_abap_typedescr=>kind_table.
+
+        CLEAR co_data.
+        FIELD-SYMBOLS <tab> TYPE table.
+        FIELD-SYMBOLS <any> TYPE any.
+        ASSIGN  i_mo_app_row2_abap->* TO <tab>.
+        LOOP AT <tab> ASSIGNING <any>.
+
+          INSERT INITIAL LINE INTO TABLE co_data ASSIGNING FIELD-SYMBOL(<row>).
+          DO.
+            DATA(lv_index) = sy-index.
+            ASSIGN COMPONENT lv_index OF STRUCTURE <any>->* TO FIELD-SYMBOL(<field>).
+            IF sy-subrc <> 0.
+              EXIT.
+            ENDIF.
+            ASSIGN COMPONENT lv_index OF STRUCTURE <row> TO FIELD-SYMBOL(<field2>).
+            <field2> = <field>->*.
+          ENDDO.
+
+
+        ENDLOOP.
+
+
+      WHEN cl_abap_typedescr=>kind_class.
+
+      WHEN cl_abap_typedescr=>kind_intf.
+
+      WHEN cl_abap_typedescr=>kind_elem.
+
+        co_data = i_mo_app_row2_abap->*.
+*        IF  o_type_desc->get_relative_name( ) = 'ABAP_BOOL'.
+*          DATA(lv_value) = COND #(  WHEN i_mo_app_row2_abap = abap_true THEN `true` ELSE `false` ).
+*          r_result = lv_value.
+*          RETURN.
+*        ENDIF.
+*
+*        r_result =  '"' && i_mo_app_row2_abap && '"'.
+
+
+      WHEN cl_abap_typedescr=>kind_ref.
+    ENDCASE.
+
+
+  ENDMETHOD.
+
+
+  METHOD hlp_get_abap_as_json.
+
+
+
+
+    DATA(o_type_desc) = cl_abap_typedescr=>describe_by_data( i_mo_app_row2_abap ).
+
+    CASE o_type_desc->kind.
+      WHEN cl_abap_typedescr=>kind_struct.
+*      DATA(o_struct_desc) = CAST cl_abap_structdescr( o_type_desc ).
+*      cl_demo_output=>write_data( o_struct_desc->components ).
+      WHEN cl_abap_typedescr=>kind_table.
+
+        r_result = /ui2/cl_json=>serialize( i_mo_app_row2_abap ).
+        RETURN.
+
+        r_result = escape( val    = /ui2/cl_json=>serialize( i_mo_app_row2_abap )
+                           format = cl_abap_format=>e_json_string ) .
+
+*      DATA(o_table_desc) = CAST cl_abap_tabledescr( o_type_desc ).
+*      DATA(o_tl_struct_desc) = CAST cl_abap_structdescr( o_table_desc->get_table_line_type( ) ).
+*      cl_demo_output=>write_data( o_tl_struct_desc->components ).
+      WHEN cl_abap_typedescr=>kind_class.
+*      DATA(o_class_desc) = CAST cl_abap_classdescr( o_type_desc ).
+*      LOOP AT o_class_desc->methods ASSIGNING FIELD-SYMBOL(xxx<m>).
+*        cl_demo_output=>write( <m>-name ).
+*      ENDLOOP.
+      WHEN cl_abap_typedescr=>kind_intf.
+*      DATA(o_if_desc) = CAST cl_abap_intfdescr( o_type_desc ).
+*      LOOP AT o_if_desc->methods ASSIGNING FIELD-SYMBOL(<i>).
+*        cl_demo_output=>write( <i>-name ).
+*      ENDLOOP.
+      WHEN cl_abap_typedescr=>kind_elem.
+
+        IF o_type_desc->get_relative_name( ) = 'ABAP_BOOL'.
+          DATA(lv_value) = COND #( WHEN i_mo_app_row2_abap = abap_true THEN `true` ELSE `false` ).
+          r_result = lv_value.
+        ELSE.
+          r_result = escape( val    = i_mo_app_row2_abap
+                     format = cl_abap_format=>e_json_string ) .
+          r_result =  '"' && r_result && '"'.
+
+        ENDIF.
+
+      WHEN cl_abap_typedescr=>kind_ref.
+    ENDCASE.
+
 
 
   ENDMETHOD.

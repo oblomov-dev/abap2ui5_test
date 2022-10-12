@@ -1,43 +1,38 @@
-class ZCL_2UI5_HTTP definition
-  public
-  create public .
+CLASS zcl_2ui5_http DEFINITION
+  PUBLIC
+  CREATE PUBLIC .
 
-public section.
+  PUBLIC SECTION.
 
-  interfaces IF_HTTP_SERVICE_EXTENSION .
-protected section.
-private section.
+    INTERFACES if_http_service_extension .
+  PROTECTED SECTION.
+  PRIVATE SECTION.
 ENDCLASS.
 
 
 
-CLASS ZCL_2UI5_HTTP IMPLEMENTATION.
+CLASS zcl_2ui5_http IMPLEMENTATION.
 
-
-  method IF_HTTP_SERVICE_EXTENSION~HANDLE_REQUEST.
+  METHOD if_http_service_extension~handle_request.
 
     DATA(lv_method) = request->get_method( ).
     DATA(lv_body)   = request->get_text(  ).
-    DATA(lt_fields) = VALUE if_web_http_request=>name_value_pairs(
+    DATA(lt_url_param) = VALUE if_web_http_request=>name_value_pairs(
          FOR row IN request->get_form_fields( ) (
                     name  = to_upper( row-name )
                     value = to_upper( row-value )
      ) ).
 
-    DATA(lv_resp) = ``.
     DATA(lv_status) = 200.
 
-    CASE lv_method.
-      WHEN 'GET'.
-        lv_resp = NEW lcl_cntrl_frontend_app( )->load( ).
-      WHEN 'POST'.
-        lv_resp = lcl_cntrl_backend_http=>roundtrip( lv_body ).
-    ENDCASE.
-
+    data(lv_resp) = SWITCH #( lv_method
+        WHEN 'GET'  THEN lcl_2ui5_backend=>main_index_html( lt_url_param )
+        WHEN 'POST' THEN lcl_2ui5_backend=>main_roundtrip( lv_body )
+      ).
 
     response->set_status( lv_status ).
     response->set_text( lv_resp ).
 
-  endmethod.
+  ENDMETHOD.
 
 ENDCLASS.
