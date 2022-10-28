@@ -154,6 +154,10 @@ CLASS zcl_2ui5_hlp_utility DEFINITION
       RETURNING
         VALUE(r_result) TYPE string.
 
+     CLASS-METHODS get_uuid_session
+      RETURNING
+        VALUE(r_result) TYPE string.
+
     CLASS-METHODS get_timestamp_utcl
       RETURNING
         VALUE(r_result) TYPE utcl.
@@ -330,6 +334,8 @@ CLASS zcl_2ui5_hlp_utility DEFINITION
     CLASS-METHODS http_db_log.
 *      IMPORTING
 *        is_db TYPE zstc77_t_001.
+  PRIVATE SECTION.
+    CLASS-DATA mv_counter TYPE int4.
 
 ENDCLASS.
 
@@ -527,9 +533,11 @@ CLASS zcl_2ui5_hlp_utility IMPLEMENTATION.
 
   METHOD trans_object_2_xml.
 
+
     CALL TRANSFORMATION id
        SOURCE data = object "i_result->ms_db-data
-       RESULT XML result.
+       RESULT XML result
+        OPTIONS data_refs = 'heap-or-create'.
     "i_result->mi_object.
 
 
@@ -1112,7 +1120,7 @@ CLASS zcl_2ui5_hlp_utility IMPLEMENTATION.
 
   METHOD get_uuid.
 
-*    r_result = lcl_help=>get_uuid(  ).
+   r_result = cl_system_uuid=>create_uuid_c32_static( ).
 
   ENDMETHOD.
 
@@ -1123,4 +1131,13 @@ CLASS zcl_2ui5_hlp_utility IMPLEMENTATION.
     lv_classname = shift_left( val = lv_classname sub = '\CLASS=' ).
 
   ENDMETHOD.
+
+
+  METHOD get_uuid_session.
+
+    mv_counter += 1.
+    r_result = shift_left( shift_right( conv string( mv_counter ) ) ).
+
+  ENDMETHOD.
+
 ENDCLASS.

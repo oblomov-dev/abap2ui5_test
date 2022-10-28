@@ -115,6 +115,7 @@ CLASS zcl_2ui5_hlp_tree_json IMPLEMENTATION.
 
     " DATA(x) = COND i( WHEN iv_json IS INITIAL THEN THROW zstc77_cx( `ZCX_TREE_JSON_READER-FACTORY-JSON_INPUT_IS_EMPTY`) ).
 
+
     r_result = NEW #(  ).
     r_result->mo_root = r_result.
 

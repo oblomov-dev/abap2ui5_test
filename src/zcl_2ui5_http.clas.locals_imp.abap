@@ -1,156 +1,132 @@
 CLASS lcl_View DEFINITION DEFERRED.
+CLASS lcl_2ui5_backend DEFINITION DEFERRED.
+CLASS hlp DEFINITION INHERITING FROM zcl_2ui5_hlp_utility.
+  PUBLIC SECTION.
+    CLASS-METHODS get_params_by_url
+      IMPORTING
+        VALUE(url)      TYPE string
+        VALUE(name)     TYPE string
+      RETURNING
+        VALUE(r_result) TYPE string.
+ENDCLASS.
 
-class hlp DEFINITION INHERITING FROM zcl_2ui5_hlp_utility.
-endclass.
+CLASS hlp IMPLEMENTATION.
+
+  METHOD get_params_by_url.
+
+    url = to_upper( url ).
+    name = to_upper( name ).
+    SPLIT url AT `&` INTO TABLE DATA(lt_href).
+    DATA(lt_url_params) = VALUE if_web_http_request=>name_value_pairs(  ).
+    LOOP AT lt_href REFERENCE INTO DATA(lr_href).
+      SPLIT lr_href->* AT `=` INTO TABLE DATA(lt_param).
+      INSERT VALUE #( name = to_upper( lt_param[ 1 ] ) value = to_upper( lt_param[ 2 ] ) ) INTO TABLE lt_url_params.
+    ENDLOOP.
+
+    r_result = lt_url_params[ name = name ]-value.
+
+  ENDMETHOD.
+
+ENDCLASS.
+
+INTERFACE zif_2ui5_event.
+
+  CONSTANTS:
+    BEGIN OF cs_event_type,
+      button TYPE string VALUE 'BUTTON',
+    END OF cs_event_type.
+
+ENDINTERFACE.
+
+INTERFACE zif_2ui5_event_button.
+
+  INTERFACES zif_2ui5_event.
+
+  METHODS get_ucomm
+    RETURNING VALUE(r_result) TYPE string.
+
+
+ENDINTERFACE.
+
+CLASS lcl_2ui5_event_button DEFINITION.
+
+  PUBLIC SECTION.
+    INTERFACES zif_2ui5_event_button.
+
+    DATA ucomm TYPE string.
+
+ENDCLASS.
+
+CLASS lcl_2ui5_event_button IMPLEMENTATION.
+
+  METHOD zif_2ui5_event_button~get_ucomm.
+        r_result = ucomm.
+  ENDMETHOD.
+
+ENDCLASS.
+
+CLASS lcl_test DEFINITION.
+
+  PUBLIC SECTION.
+
+    DATA mv_test TYPE string VALUE 'ABC'.
+    DATA mv_test2 TYPE string VALUE 'ddd'.
+ENDCLASS.
+
+CLASS lcl_test_new DEFINITION.
+
+ENDCLASS.
+
 
 INTERFACE zif_2ui5_screen.
 
   METHODS begin_of
     IMPORTING
-              name            TYPE string OPTIONAL
-    RETURNING VALUE(r_result) TYPE REF TO zif_2ui5_screen.
+      name            TYPE string OPTIONAL
+    RETURNING
+      VALUE(r_result) TYPE REF TO zif_2ui5_screen.
 
   METHODS end_of
     IMPORTING
-              name            TYPE string OPTIONAL
-    RETURNING VALUE(r_result) TYPE REF TO zif_2ui5_screen.
+      name            TYPE string OPTIONAL
+    RETURNING
+      VALUE(r_result) TYPE REF TO zif_2ui5_screen.
 
   METHODS button
     IMPORTING
-              text            TYPE REF TO data OPTIONAL
-    RETURNING VALUE(r_result) TYPE REF TO zif_2ui5_screen.
+      text            TYPE string OPTIONAL
+      ucomm           TYPE string
+    RETURNING
+      VALUE(r_result) TYPE REF TO zif_2ui5_screen.
+
+  METHODS input
+    IMPORTING
+      value           TYPE REF TO data OPTIONAL
+    RETURNING
+      VALUE(r_result) TYPE REF TO zif_2ui5_screen.
 
   METHODS text
     IMPORTING
-              text            TYPE string OPTIONAL
-    RETURNING VALUE(r_result) TYPE REF TO zif_2ui5_screen.
+      text            TYPE string OPTIONAL
+    RETURNING
+      VALUE(r_result) TYPE REF TO zif_2ui5_screen.
 
 ENDINTERFACE.
 
-CLASS lcl_screen DEFINITION.
+CLASS lcl_2ui5_screen DEFINITION.
 
   PUBLIC SECTION.
 
-    TYPES:
-      BEGIN OF s_control,
-        name    TYPE string,
-        t_attri TYPE if_web_http_request=>name_value_pairs,
-        value   TYPE REF TO data,
-      END OF s_control.
-
-    TYPES:
-      BEGIN OF s_screen,
-        name      TYPE string,
-        t_content TYPE STANDARD TABLE OF s_control WITH EMPTY KEY,
-      END OF s_screen.
-
-    DATA mt_screen TYPE STANDARD TABLE OF s_screen.
-    DATA mr_screen_actual TYPE REF TO s_screen.
-
-    DATA mv_xml_view TYPE string.
-    DATA mv_view_model TYPE string.
-
-    METHODS set_back_2_front
-      RETURNING
-        VALUE(r_result) TYPE string.
-
     INTERFACES zif_2ui5_screen.
-  PRIVATE SECTION.
-    DATA mv_actual_screen TYPE string.
+
+    DATA mo_backend TYPE REF TO lcl_2ui5_backend.
+
+    METHODS constructor
+      IMPORTING
+        i_backend TYPE REF TO lcl_2ui5_backend.
 
 ENDCLASS.
 
-CLASS lcl_screen IMPLEMENTATION.
-
-  METHOD zif_2ui5_screen~begin_of.
-
-    INSERT VALUE #(
-        name = name
-     ) INTO TABLE mt_screen.
-
-    mr_screen_actual = REF #( mt_screen[ lines( mt_screen ) ] ).
-
-
-  ENDMETHOD.
-
-  METHOD zif_2ui5_screen~button.
-
-    INSERT VALUE #(
-      name  = 'BUTTON'
-      value = REF #( text->* )
-     ) INTO TABLE mr_screen_actual->t_content.
-
-*endcase.
-
-  ENDMETHOD.
-
-  METHOD zif_2ui5_screen~end_of.
-
-  ENDMETHOD.
-
-  METHOD zif_2ui5_screen~text.
-
-    INSERT VALUE #(
-      name  = 'TEXT'
-      t_attri = VALUE #( ( name = 'TEXT' value = text ) )
-     ) INTO TABLE mr_screen_actual->t_content.
-
-  ENDMETHOD.
-
-  METHOD set_back_2_front.
-
-*    IF mt_xml_abap IS NOT INITIAL.
-*      r_result = REDUCE #( INIT result = `` FOR row IN mt_xml_abap NEXT result &&= row )   .
-*    ELSE.
-*      r_result = mv_xml_abap.
-*      RETURN.
-*    ENDIF.
-
-*    DATA(lo_abap) = zcl_2ui5_hlp_tree_xml=>factory( ).
-    DATA(lo_ui5)  = zcl_2ui5_hlp_tree_xml=>factory( ).
-
-    "attribute
-    lo_ui5->mv_name = 'View'.
-    lo_ui5->mv_namespace = 'mvc'.
-    lo_ui5->set_attribute( n = `controllerName` v = `MyController` ).
-
-*    xml_ui5_new( lo_abap ).
-
-
-    r_result = `<mvc:View controllerName='MyController' xmlns:mvc='sap.ui.core.mvc' displayBlock="true"` && |\n|  &&
-                         `    xmlns="sap.m">   <Page id="page" title="{i18n>title}">` && |\n|  &&
-                         `        <content>   `.
-    "    <Button type="Back" press="onPress" text="das ist ein test" />` && |\n|  &&
-
-
-
-    DATA(ls_screen) = mt_screen[ name = mv_actual_screen ].
-
-    LOOP AT ls_screen-t_content INTO DATA(ls_element).
-
-      CASE ls_element-name.
-
-        WHEN `BUTTON`.
-          r_result = r_result && ` <Button text='buchen' press='onEvent({ "test" : "tttt" })' />  `.
-
-        WHEN `TEXT`.
-
-
-      ENDCASE.
-
-    ENDLOOP.
-
-    r_result = r_result && `        </content>` && |\n|  &&
-                         `    </Page>` && |\n|  &&
-                         `</mvc:View>`.
-
-
-    "  r_result = lo_ui5->write( ).
-    "  r_result = replace( val = r_result sub = '&quot;' with = '"' occ = 0 ).
-
-  ENDMETHOD.
-
-ENDCLASS.
 
 INTERFACE zif_2ui5_frontend.
 
@@ -158,23 +134,34 @@ INTERFACE zif_2ui5_frontend.
     IMPORTING
       name TYPE string.
 
-*    get_event
 
 ENDINTERFACE.
 
 INTERFACE zif_2ui5_selection_screen.
   INTERFACES if_serializable_object.
 
+  METHODS pbo DEFAULT IGNORE.
+
   METHODS render
     IMPORTING
       screen TYPE REF TO zif_2ui5_screen.
 
-  METHODS roundtrip
+  METHODS on_event
     IMPORTING
-      frontend TYPE REF TO zif_2ui5_frontend OPTIONAL
-      view     TYPE REF TO lcl_view.
+      event    TYPE REF TO zif_2ui5_event
+      frontend TYPE REF TO zif_2ui5_frontend OPTIONAL.
+  "   view     TYPE REF TO lcl_view.
 
 ENDINTERFACE.
+
+CLASS lcl_2ui5_frontend DEFINITION.
+
+  PUBLIC SECTION.
+    INTERFACES zif_2ui5_frontend.
+
+    DATA mo_backend TYPE REF TO lcl_2ui5_backend.
+    "  DATA mv_screen TYPE string.
+ENDCLASS.
 
 
 
@@ -348,12 +335,12 @@ CLASS lcl_view IMPLEMENTATION.
 
   METHOD constructor.
 
-    /ui2/cl_json=>deserialize(
-        EXPORTING
-           json  = iv_body
-        CHANGING
-           data  = mr_body
-       ).
+*    /ui2/cl_json=>deserialize(
+*        EXPORTING
+*           json  = iv_body
+*        CHANGING
+*           data  = mr_body
+*       ).
 
   ENDMETHOD.
 
@@ -569,12 +556,33 @@ ENDCLASS.
 
 CLASS lcl_2ui5_backend DEFINITION.
   PUBLIC SECTION.
+*
+    TYPES:
+      BEGIN OF s_control,
+        name      TYPE string,
+        id        TYPE string,
+        t_attri   TYPE if_web_http_request=>name_value_pairs,
+        attr_name TYPE string,
+        value     TYPE REF TO string,
+      END OF s_control.
+
+    TYPES:
+      BEGIN OF s_screen,
+        name      TYPE string,
+        t_content TYPE STANDARD TABLE OF s_control WITH EMPTY KEY,
+      END OF s_screen.
+
+    DATA mt_screen TYPE STANDARD TABLE OF s_screen.
+    DATA mr_screen_actual TYPE REF TO s_screen.
+
 
     INTERFACES if_serializable_object.
     INTERFACES if_abap_parallel.
     DATA mv_xml TYPE string.
-    DATA mo_view TYPE REF TO lcl_view.
-
+    " DATA mo_view TYPE REF TO lcl_view.
+    " DATA mo_screen TYPE REF TO lcl_2ui5_screen.
+    "  DATA mo_frontend TYPE REF TO lcl_2ui5_frontend.
+    data mv_screen_actual type string.
     DATA mi_app TYPE REF TO zif_2ui5_selection_screen.
 
     DATA:
@@ -613,7 +621,7 @@ CLASS lcl_2ui5_backend DEFINITION.
     METHODS execute_roundtrip.
     METHODS execute_finish
       RETURNING
-        VALUE(rv_resp) TYPE string.
+        VALUE(r_result) TYPE string.
     METHODS init_prev.
     METHODS init_app.
     METHODS go_app_change.
@@ -621,6 +629,9 @@ CLASS lcl_2ui5_backend DEFINITION.
     METHODS go_back
       RETURNING VALUE(r_result) TYPE REF TO lcl_2ui5_backend.
   PRIVATE SECTION.
+    DATA: lo_body  TYPE zcl_2ui5_hlp_tree_json=>ty_o_me,
+
+          mi_event TYPE REF TO zif_2ui5_event.
 
 ENDCLASS.
 
@@ -632,15 +643,15 @@ CLASS lcl_2ui5_backend IMPLEMENTATION.
 
     lo_model->execute_init( iv_body ).
 
-    lo_model->execute_roundtrip(  ).
+    lo_model->execute_roundtrip( ).
 
-    IF lo_model->mo_view->mv_new_app IS NOT INITIAL OR lo_model->mo_view->mo_new_app IS BOUND.
-      lo_model->go_app_change(  ).
-      lo_model->execute_roundtrip(  ).
-
-    ELSEIF lo_model->mo_view->mv_check_go_back = abap_true.
-      lo_model = lo_model->go_back( ).
-    ENDIF.
+*    IF lo_model->mo_view->mv_new_app IS NOT INITIAL OR lo_model->mo_view->mo_new_app IS BOUND.
+*      lo_model->go_app_change(  ).
+*      lo_model->execute_roundtrip(  ).
+*
+*    ELSEIF lo_model->mo_view->mv_check_go_back = abap_true.
+*      lo_model = lo_model->go_back( ).
+*    ENDIF.
 
     rv_resp = lo_model->execute_finish( ).
 
@@ -648,34 +659,80 @@ CLASS lcl_2ui5_backend IMPLEMENTATION.
 
   METHOD db_load.
 
-*    SELECT SINGLE FROM zzt_lktest_001
-*        FIELDS
-*            *
-*       WHERE id = @id
-*      INTO @DATA(ls_model).
+    SELECT SINGLE FROM z2ui5_t_001
+        FIELDS
+            *
+       WHERE uuid = @id
+      INTO @DATA(ls_model).
+
 *
-*    r_result = CAST #( hlp=>trans_xml_2_object( ls_model-data ) ).
+*    DATA(writer) = cl_sxml_string_writer=>create(
+*          type = if_sxml=>co_xt_json ).
+*
+*    CALL TRANSFORMATION id SOURCE xml = ls_model-data
+*                           RESULT data = r_result " writer
+*                           OPTIONS data_refs = 'heap-or-create'.
+
+
+    r_result = CAST #( hlp=>trans_xml_2_object( ls_model-data ) ).
 
   ENDMETHOD.
 
   METHOD db_save.
 
-*    MODIFY zzt_lktest_001 FROM @( VALUE #(
-*      id   = ms_config-id
-*      data = hlp=>trans_object_2_xml( me )
-*      ) ).
+*clear mt_screen.
+*clear mr_screen_actual.
+
+*    DATA(lv_string) = CONV string( `` ).
 *
-*    COMMIT WORK.
+*    CALL TRANSFORMATION id SOURCE dref = me
+*                           RESULT XML lv_string
+*                           OPTIONS data_refs = 'heap-or-create'.
+*
+*  DATA lo_app LIKE me.
+*
+*    CALL TRANSFORMATION id SOURCE XML lv_string
+*                             RESULT dref = lo_app.
+
+
+*    DATA(writer) = cl_sxml_string_writer=>create(
+*        type = if_sxml=>co_xt_json ).
+
+*    CALL TRANSFORMATION id SOURCE dref = me
+*                           RESULT XML writer
+*                           OPTIONS data_refs = 'heap-or-create'.
+
+    " lv_string = writer->wrget_output( ).
+
+*    DATA lo_app LIKE me.
+*
+*    CALL TRANSFORMATION id SOURCE XML lv_string
+*                             RESULT dref = lo_app
+*                             OPTIONS data_refs = 'heap-or-create'.
+
+    MODIFY z2ui5_t_001 FROM @( VALUE #(
+      uuid = ms_config-id
+      data = hlp=>trans_object_2_xml( me )
+      ) ).
+
+    COMMIT WORK.
 
   ENDMETHOD.
 
 
   METHOD execute_init.
 
-    mo_view = NEW #( iv_body ).
+    " mo_view = NEW #( iv_body ).
 
-    ms_config-id = hlp=>get( VALUE #( uuid = abap_true ) )-uuid.
-    ms_config-id_prev = mo_view->body_get( 'ID' ).
+    "  mo_frontend = NEW #( ).
+    TRY.
+        lo_body = zcl_2ui5_hlp_tree_json=>factory( iv_body ).
+        ms_config-id_prev = lo_body->get_attribute( 'ID' )->get_val( ).
+      CATCH cx_root.
+    ENDTRY.
+
+    ms_config-id = hlp=>get_uuid( ). "( VALUE #( uuid = abap_true ) )-uuid.
+    "  ms_config-id_prev = mo_view->body_get( 'ID' ).
 
     IF ms_config-id_prev IS INITIAL.
       init_app( ).
@@ -688,32 +745,156 @@ CLASS lcl_2ui5_backend IMPLEMENTATION.
 
   METHOD execute_finish.
 
-    DATA(lo_model) = NEW zcl_2ui5_hlp_tree_json( )->add_attribute(
-     n           = 'vView'
-     v           = mo_view->get_xml_ui5( ) "REDUCE #( INIT result = `` FOR row IN mo_view->mt_xml_abap NEXT result &&= row )
-     )->add_attribute_object( name = 'vModel' ).
+
+    DATA(lo_app) = CAST object( mi_app ).
+    DATA(lr_screen) =  REF #( mt_screen[ name = mv_screen_actual ] ).
 
 
-    lo_model->add_attribute( n = 'id' v = ms_config-id ).
+   " DATA(lo_test) = NEW lcl_test( ).
+ "   DATA(lr_assign) = REF #(  lo_test->mv_test2 ).
 
 
-    DATA(lo_object) = CAST object(  mi_app ).
+    DATA(lo_descr) = CAST cl_abap_classdescr( cl_abap_objectdescr=>describe_by_object_ref(
+         p_object_ref         = lo_app
+         ) ).
 
-    LOOP AT mo_view->mt_binding REFERENCE INTO DATA(lr_bind).
+    DATA(lt_attri) = lo_descr->attributes.
 
-      TRY.
-          DATA(lo_ref) = REF #( lo_object->(lr_bind->abap) ).
+    LOOP AT lt_attri REFERENCE INTO DATA(lr_attri)
+    WHERE visibility = cl_abap_classdescr=>public
+    AND type_kind = cl_abap_classdescr=>typekind_string.
 
-          lo_model->add_attribute( n = lr_bind->json v = hlp=>hlp_get_abap_as_json( lo_ref->* ) apos_active = abap_false ).
+      DATA(lv_name) = lr_attri->name.
+      DATA(lr_assign_gen) = REF #( lo_app->(lr_attri->name) ).
 
-        CATCH cx_root.
-      ENDTRY.
+      LOOP AT lr_screen->t_content REFERENCE INTO DATA(lr_element)
+        where value is not INITIAL and NAME = 'INPUT'.
+
+        IF lr_assign_gen = lr_element->value.
+          lr_element->attr_name = lv_name.
+          CLEAR lr_element->value.
+        ENDIF.
+
+      ENDLOOP.
+
     ENDLOOP.
 
-    rv_resp = lo_model->get_root( )->write_result( ).
+*    IF lr_assign = lr_assign_gen.
+*      DATA(lv_name_save) = lv_name.
+*    ENDIF.
+*
+*    DATA(lo_descr_ref) = cl_abap_refdescr=>describe_by_data_ref(
+*       EXPORTING
+*         p_data_ref           = lr_assign
+**      RECEIVING
+**        p_descr_ref          =
+**      EXCEPTIONS
+**        reference_is_initial = 1
+**        others               = 2
+*     ).
+*    IF sy-subrc <> 0.
+**     MESSAGE ID SY-MSGID TYPE SY-MSGTY NUMBER SY-MSGNO
+**       WITH SY-MSGV1 SY-MSGV2 SY-MSGV3 SY-MSGV4.
+*    ENDIF.
 
-    CLEAR me->mo_view->mr_body.
-    NEW cl_abap_parallel( )->fork_inst( VALUE #( ( me ) ) ).
+
+
+
+
+
+
+
+    "rv_resp = mo_screen->set_back_2_front( ).
+
+    r_result = `<mvc:View controllerName='MyController' xmlns:mvc='sap.ui.core.mvc' displayBlock="true"` && |\n|  &&
+                         `    xmlns="sap.m">   <Page id="page" title="{i18n>title}">` && |\n|  &&
+                         `        <content>   `.
+    "    <Button type="Back" press="onPress" text="das ist ein test" />` && |\n|  &&
+
+
+
+
+
+
+    LOOP AT lr_screen->t_content REFERENCE INTO lr_element.
+
+      CASE lr_element->name.
+
+        WHEN `BUTTON`.
+          DATA(lv_value) = CONV string( lr_element->t_attri[ name = `TEXT` ]-value  ).
+          r_result = r_result && ` <Button text=' ` && lv_value && `' press='onEventBackend({ "KIND" : "BUTTON" , "UCOMM" : "` &&
+          VALUE #( lr_element->t_attri[ name = `UCOMM` ]-value OPTIONAL )
+          && `" })' />  `.
+
+        WHEN `TEXT`.
+
+        WHEN `INPUT`.
+
+          lr_element->id = hlp=>get_uuid_session( ).
+
+          r_result = r_result && `<Input` &&  |\n|  &&
+          "     `          id="` && lr_element->id && `"` && |\n|  &&
+               `          placeholder="Enter product` && `"` && |\n|  &&
+               `          value="` && `{/` && lr_element->id && `}"` &&
+               `          showSuggestion="true"   />` .
+
+      ENDCASE.
+
+    ENDLOOP.
+
+    r_result = r_result && `        </content>` && |\n|  &&
+                         `    </Page>` && |\n|  &&
+                         `</mvc:View>`.
+
+
+
+    DATA(lo_ui5)  = zcl_2ui5_hlp_tree_json=>factory( ).
+    lo_ui5->add_attribute( n = `vView` v = r_result ).
+
+
+    DATA(lo_model) = lo_ui5->add_attribute_object( 'vModel' ).
+    lo_model->add_attribute( n = 'id' v = ms_config-id ).
+
+    LOOP AT lr_screen->t_content REFERENCE INTO lr_element
+        WHERE name = 'INPUT'.
+
+      lv_value = CONV string( lo_app->(lr_element->attr_name) ).
+      lo_model->add_attribute( n = lr_element->id v = lv_value ).
+
+    ENDLOOP.
+
+    r_result = lo_ui5->get_root( )->write_result( ).
+    db_save( ).
+    RETURN.
+
+
+
+*    DATA(lo_model) = NEW zcl_2ui5_hlp_tree_json( )->add_attribute(
+*     n           = 'vView'
+*     v           = mo_view->get_xml_ui5( ) "REDUCE #( INIT result = `` FOR row IN mo_view->mt_xml_abap NEXT result &&= row )
+*     )->add_attribute_object( name = 'vModel' ).
+*
+*
+*    lo_model->add_attribute( n = 'id' v = ms_config-id ).
+*
+*
+*    DATA(lo_object) = CAST object(  mi_app ).
+*
+*    LOOP AT mo_view->mt_binding REFERENCE INTO DATA(lr_bind).
+*
+*      TRY.
+*          DATA(lo_ref) = REF #( lo_object->(lr_bind->abap) ).
+*
+*          lo_model->add_attribute( n = lr_bind->json v = hlp=>hlp_get_abap_as_json( lo_ref->* ) apos_active = abap_false ).
+*
+*        CATCH cx_root.
+*      ENDTRY.
+*    ENDLOOP.
+*
+*    rv_resp = lo_model->get_root( )->write_result( ).
+*
+*    CLEAR me->mo_view->mr_body.
+*    NEW cl_abap_parallel( )->fork_inst( VALUE #( ( me ) ) ).
 
     "db_save( ).
 
@@ -724,18 +905,27 @@ CLASS lcl_2ui5_backend IMPLEMENTATION.
     TRY.
 
         ROLLBACK WORK.
-        mi_app->roundtrip( mo_view ).
+
+          data(lo_frontend) =   NEW lcl_2ui5_frontend(  ).
+          lo_frontend->mo_backend = me.
+        mi_app->on_event(
+           frontend = lo_frontend
+           event = mi_event
+             ).
         ROLLBACK WORK.
+
+        mi_app->render(
+            screen = NEW lcl_2ui5_screen( me ) ).
 
       CATCH cx_root INTO DATA(lx).
         DATA(lo_app_error) = NEW lcl_app_error(  ).
         lo_app_error->mx = lx.
         lo_app_error->mv_error_classname = cl_abap_classdescr=>get_class_name( mi_app  ).
 
-        mi_app = lo_app_error.
-        ROLLBACK WORK.
-        mi_app->roundtrip( mo_view ).
-        ROLLBACK WORK.
+*        mi_app = lo_app_error.
+*        ROLLBACK WORK.
+*        mi_app->on_event( mo_view ).
+*        ROLLBACK WORK.
 
     ENDTRY.
   ENDMETHOD.
@@ -743,21 +933,65 @@ CLASS lcl_2ui5_backend IMPLEMENTATION.
 
   METHOD init_prev.
 
-    DATA(lo_prev) = COND #( WHEN mo_view->mr_body IS BOUND
-        THEN db_load( mo_view->mr_body->('ID')->* ) ).
+    DATA(lo_prev) = db_load( ms_config-id_prev ).
 
+*    DATA(lo_prev) = COND #( WHEN mo_view->mr_body IS BOUND
+*        THEN db_load( mo_view->mr_body->('ID')->* ) ).
+*
     DATA(lo_obj) = CAST object( lo_prev->mi_app ).
 
-    LOOP AT lo_prev->mo_view->mt_binding INTO DATA(ls_bind).
 
-      hlp=>hlp_get_json_as_abap(
-        EXPORTING
-          i_mo_app_row2_abap = mo_view->mr_body->(ls_bind-json)
-        CHANGING
-          co_data            = lo_obj->(ls_bind-abap)
-      ).
+    LOOP AT lo_prev->mt_screen INTO DATA(ls_screen)
+        WHERE name = 'NO_URL_INFO'.
+
+
+      LOOP AT ls_screen-t_content INTO DATA(ls_content).
+
+        IF ls_content-id IS NOT INITIAL.
+          TRY.
+              DATA(lv_value) = lo_body->get_attribute( name = ls_content-id )->get_val( ).
+
+              ls_content-value = REF #( lo_obj->(ls_content-attr_name) ).
+              ls_content-value->* = lv_value.
+
+            CATCH cx_root.
+          ENDTRY.
+
+
+
+        ENDIF.
+
+      ENDLOOP.
+
 
     ENDLOOP.
+
+
+    "event objekt
+    TRY.
+        DATA(lo_event) = NEW lcl_2ui5_event_button(  ).
+        DATA(lv_kind) = lo_body->get_attribute( 'OEVENT' )->get_attribute( 'KIND' )->get_val( ).
+        DATA(lv_ucomm) = lo_body->get_attribute( 'OEVENT' )->get_attribute( 'UCOMM' )->get_val( ).
+
+        lo_event->ucomm = lv_ucomm.
+        mi_event = lo_event.
+
+        "  lo_body->get_attribute
+
+
+*    LOOP AT lo_prev->mo_view->mt_binding INTO DATA(ls_bind).
+*
+*      hlp=>hlp_get_json_as_abap(
+*        EXPORTING
+*          i_mo_app_row2_abap = mo_view->mr_body->(ls_bind-json)
+*        CHANGING
+*          co_data            = lo_obj->(ls_bind-abap)
+*      ).
+*
+*    ENDLOOP.
+
+      CATCH cx_root.
+    ENDTRY.
 
     mi_app = CAST #( lo_obj ).
 
@@ -765,44 +999,31 @@ CLASS lcl_2ui5_backend IMPLEMENTATION.
 
 
   METHOD init_app.
-
-    DATA(lv_window_search) = CONV string( mo_view->mr_body->('WINDOW')->('SEARCH')->* ).
-
-    lv_window_search = shift_left( val = lv_window_search sub = `?` ).
-
-    SPLIT lv_window_search AT '&' INTO TABLE DATA(lt_split).
-    DATA(lt_fields) = VALUE if_web_http_request=>name_value_pairs(
-        FOR row IN lt_split (
-             name = to_upper( segment( val = row sep = '=' index = 1  ) )
-             value = to_upper( segment( val = row sep = '=' index = 2  ) )
-     )  ).
-
-
-    DATA(lv_app) = VALUE #( lt_fields[ name = `APP` ]-value DEFAULT `LCL_APP_SYSTEM` ).
-
     TRY.
-        CREATE OBJECT mi_app TYPE (lv_app).
+
+        DATA(lv_href) = lo_body->get_attribute( 'WINDOW' )->get_attribute( 'HREF' )->get_val( ).
+        DATA(lv_app_name) = hlp=>get_params_by_url( url = lv_href name = 'APP' ).
+        CREATE OBJECT mi_app TYPE (lv_app_name).
+
       CATCH cx_root.
-        CREATE OBJECT mi_app TYPE ('lcl_app_start').
-        mi_app->('mv_error_app_input') = lv_app.
+        CREATE OBJECT mi_app TYPE ('LCL_APP_SYSTEM').
     ENDTRY.
   ENDMETHOD.
 
-
   METHOD go_app_change.
 
-    TRY.
-        IF mo_view->mo_new_app IS BOUND.
-          mi_app = CAST #( mo_view->mo_new_app ).
-        ELSE.
-          DATA(lv_new_app) = to_upper( mo_view->mv_new_app ).
-          CREATE OBJECT mi_app TYPE (lv_new_app).
-        ENDIF.
-
-      CATCH cx_root.
-        " CREATE OBJECT mi_app TYPE ('lcl_app_start').
-        "  mi_app->('mv_error_app_input') = lv_app.
-    ENDTRY.
+*    TRY.
+*        IF mo_view->mo_new_app IS BOUND.
+*          mi_app = CAST #( mo_view->mo_new_app ).
+*        ELSE.
+*          DATA(lv_new_app) = to_upper( mo_view->mv_new_app ).
+*          CREATE OBJECT mi_app TYPE (lv_new_app).
+*        ENDIF.
+*
+*      CATCH cx_root.
+*        " CREATE OBJECT mi_app TYPE ('lcl_app_start').
+*        "  mi_app->('mv_error_app_input') = lv_app.
+*    ENDTRY.
 
   ENDMETHOD.
 
@@ -829,7 +1050,7 @@ CLASS lcl_2ui5_backend IMPLEMENTATION.
     r_result = `<html>` && |\n|  &&
                `<head>` && |\n|  &&
                `    <meta charset="utf-8">` && |\n|  &&
-               `    <title>Fiori-Abap Painter</title>` && |\n|  &&
+               `    <title>abap2ui5</title>` && |\n|  &&
                `    <script src="https://ui5.sap.com/resources/sap-ui-core.js" id="sap-ui-bootstrap" data-sap-ui-theme="sap_fiori_3"` && |\n|  &&
                `        data-sap-ui-libs="sap.m" data-sap-ui-bindingSyntax="complex" data-sap-ui-compatVersion="edge"` && |\n|  &&
                `        data-sap-ui-preload="async">` && |\n|  &&
@@ -900,10 +1121,20 @@ CLASS lcl_2ui5_backend IMPLEMENTATION.
 
 ENDCLASS.
 
+CLASS lcl_2ui5_frontend IMPLEMENTATION.
+
+  METHOD zif_2ui5_frontend~call_screen.
+
+    mo_backend->mv_screen_actual = name.
+
+
+  ENDMETHOD.
+
+ENDCLASS.
 
 CLASS lcl_app_error IMPLEMENTATION.
 
-  METHOD zif_2ui5_selection_screen~roundtrip.
+  METHOD zif_2ui5_selection_screen~on_event.
 
 *    ui_on_init( view ).
 *    ui_on_event( view ).
@@ -971,9 +1202,9 @@ ENDCLASS.
 
 CLASS lcl_app_demo IMPLEMENTATION.
 
-  METHOD zif_2ui5_selection_screen~roundtrip.
+  METHOD zif_2ui5_selection_screen~on_event.
 
-    view->mv_xml_abap = view->db_read( 'LCL_APP_DEMO' ).
+    "  view->mv_xml_abap = view->db_read( 'LCL_APP_DEMO' ).
     " mv_xml =  view->db_read( 'LCL' ).
 
   ENDMETHOD.
@@ -995,7 +1226,7 @@ ENDCLASS.
 
 CLASS lcl_view_editor IMPLEMENTATION.
 
-  METHOD zif_2ui5_selection_screen~roundtrip.
+  METHOD zif_2ui5_selection_screen~on_event.
 
 *    view->mv_xml_abap = view->db_read( 'test_name3' ).
 *    mv_xml =  view->db_read( 'test_name3' ).
@@ -1059,6 +1290,8 @@ CLASS lcl_app_system DEFINITION.
 
     DATA mv_check_visible TYPE abap_bool.
 
+    "  data mv_value type string.
+
     DATA:
       BEGIN OF ms_screen,
         BEGIN OF s_msg_stripe,
@@ -1077,9 +1310,6 @@ CLASS lcl_app_system DEFINITION.
       IMPORTING
         i_view TYPE REF TO lcl_view.
 
-    METHODS ui_on_event
-      IMPORTING
-        i_view TYPE REF TO lcl_view.
     METHODS ui_set_screen
       IMPORTING
         i_view   TYPE REF TO lcl_view
@@ -1090,37 +1320,23 @@ ENDCLASS.
 
 CLASS lcl_app_system IMPLEMENTATION.
 
-  METHOD zif_2ui5_selection_screen~roundtrip.
+  METHOD zif_2ui5_selection_screen~on_event.
 
-    ui_on_init( view ).
-    ui_on_event( view ).
-*    ui_set_screen( view ).
+    CASE TYPE OF event.
+      WHEN TYPE zif_2ui5_event_button INTO DATA(event_button).
 
+        CASE event_button->get_ucomm(  ).
 
-    frontend->call_screen( 'NO_URL_INFO' ).
-
-  ENDMETHOD.
-
-
-  METHOD ui_on_event.
-
-    CASE i_view->get_event( 'EVENT_TYPE' ).
-
-      WHEN 'button'.
-
-        CASE i_view->get_event( 'UCOMM' ).
-
-          WHEN 'WEITER' OR 'post'.
-
-
-          WHEN 'GO'.
-            i_view->set_app( val = ms_screen-app_name ).
-            " RAISE EXCEPTION NEW hlp( ).
-
+          WHEN 'POST'.
+            frontend->call_screen( '0200' ).
 
         ENDCASE.
-    ENDCASE.
 
+      WHEN OTHERS.
+        mv_value = 'first call'.
+        frontend->call_screen( 'NO_URL_INFO' ).
+
+    ENDCASE.
   ENDMETHOD.
 
 
@@ -1158,12 +1374,13 @@ CLASS lcl_app_system IMPLEMENTATION.
 
     screen->begin_of( 'NO_URL_INFO'
         )->text( 'Bitte Klasse in den URL Parametern angeben'
-        )->button( text = REF #( mv_button_text ) ).
+        )->button( text = 'weiter' ucomm = 'POST'
+        )->input( value = REF #( mv_value ) ).
     screen->end_of( ).
 
     screen->begin_of( '0200'
-        )->text( 'Das ist ein Text'
-        )->button( text = REF #( mv_button_text ) ).
+        )->text( text = 'Das ist ein Text'
+        )->button( text = mv_button_text  ucomm = 'TEST' ).
     screen->end_of( ).
 
 
@@ -1228,6 +1445,77 @@ CLASS lcl_salesorder_crudq IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD _clear_buffer.
+
+  ENDMETHOD.
+
+ENDCLASS.
+
+
+CLASS lcl_2ui5_screen IMPLEMENTATION.
+
+  METHOD constructor.
+
+    me->mo_backend = i_backend.
+
+  ENDMETHOD.
+
+  METHOD zif_2ui5_screen~begin_of.
+
+    r_result = me.
+
+    INSERT VALUE #(
+        name = name
+     ) INTO TABLE mo_backend->mt_screen.
+
+    mo_backend->mr_screen_actual = REF #( mo_backend->mt_screen[ lines( mo_backend->mt_screen ) ] ).
+
+
+  ENDMETHOD.
+
+  METHOD zif_2ui5_screen~button.
+
+    r_result = me.
+
+    INSERT VALUE #(
+      name  = 'BUTTON'
+
+      t_attri = VALUE #(
+        ( name = 'UCOMM' value = ucomm )
+        ( name = 'TEXT' value = text )
+        )
+     ) INTO TABLE mo_backend->mr_screen_actual->t_content.
+
+
+  ENDMETHOD.
+
+  METHOD zif_2ui5_screen~end_of.
+
+    r_result = me.
+
+  ENDMETHOD.
+
+  METHOD zif_2ui5_screen~text.
+
+    r_result = me.
+
+    INSERT VALUE #(
+      name  = 'TEXT'
+      t_attri = VALUE #( ( name = 'TEXT' value = text ) )
+     ) INTO TABLE mo_backend->mr_screen_actual->t_content.
+
+  ENDMETHOD.
+
+
+
+  METHOD zif_2ui5_screen~input.
+
+    r_result = me.
+
+    INSERT VALUE #(
+      name  = 'INPUT'
+      value = REF #( value->* )
+*      t_attri = VALUE #( ( name = 'VALUE' value = value->* ) )
+     ) INTO TABLE mo_backend->mr_screen_actual->t_content.
 
   ENDMETHOD.
 
