@@ -18,6 +18,23 @@ CLASS zcl_2ui5_hlp_utility DEFINITION
     TYPES:
       BEGIN OF ty,
         BEGIN OF s,
+          BEGIN OF property,
+            n    TYPE string,
+            v    TYPE string,
+            name TYPE string,
+          END OF property,
+          BEGIN OF control,
+            name       TYPE string,
+            ns         TYPE string,
+            t_property TYPE STANDARD TABLE OF ty-s-property WITH EMPTY KEY, "if_web_http_request=>name_value_pairs,
+            t_child    TYPE STANDARD TABLE OF REF TO data WITH EMPTY KEY,
+            parent     TYPE REF TO data,
+          END OF control,
+          BEGIN OF attri,
+            name       TYPE string,
+            kind       TYPE string,
+            check_used TYPE abap_bool,
+          END OF attri,
           BEGIN OF msg,
             id TYPE string,
             ty TYPE string,
@@ -52,8 +69,10 @@ CLASS zcl_2ui5_hlp_utility DEFINITION
           END OF get_result,
         END OF s,
         BEGIN OF t,
-          range  TYPE cl_abap_range=>ds_trange,
-          selopt TYPE cl_abap_range=>ds_selopt_t,
+          property TYPE STANDARD TABLE OF ty-s-property WITH EMPTY KEY,
+          range    TYPE cl_abap_range=>ds_trange,
+          selopt   TYPE cl_abap_range=>ds_selopt_t,
+          attri    TYPE STANDARD TABLE OF ty-s-attri WITH EMPTY KEY,
         END OF t,
         BEGIN OF o,
           me TYPE REF TO zcl_2ui5_hlp_utility,
@@ -70,6 +89,7 @@ CLASS zcl_2ui5_hlp_utility DEFINITION
         x_root TYPE REF TO cx_root,
         "   x_me   type ty-o_me,
         uuid   TYPE string,
+        kind   TYPE string,
         text   TYPE string,
         s_msg  TYPE ty-s-msg_result,
         o_log  TYPE ty-o-me,
@@ -80,15 +100,25 @@ CLASS zcl_2ui5_hlp_utility DEFINITION
     METHODS constructor
       IMPORTING
         val      TYPE any OPTIONAL
+        kind     TYPE string OPTIONAL
         textid   LIKE if_t100_message=>t100key OPTIONAL
         previous LIKE previous OPTIONAL
           PREFERRED PARAMETER val.
 
     METHODS get_text REDEFINITION.
 
+    CLASS-METHODS get_xml_by_control
+      IMPORTING
+        ms_control      TYPE ty-s-control
+      RETURNING
+        VALUE(r_result) TYPE string.
+
     CLASS-METHODS log_factory
       RETURNING
         VALUE(result) TYPE ty-o-me.
+
+    METHODS x_get_kind
+      RETURNING VALUE(r_result) TYPE string.
 
     METHODS log
       IMPORTING
@@ -138,11 +168,11 @@ CLASS zcl_2ui5_hlp_utility DEFINITION
 
     CLASS-METHODS mail.
 
-    class-methods get_classname_by_ref
-        importing
-            in type ref to object
-        RETURNING
-        VALUE(r_result) type string.
+    CLASS-METHODS get_classname_by_ref
+      IMPORTING
+        in              TYPE REF TO object
+      RETURNING
+        VALUE(r_result) TYPE string.
 
     CLASS-METHODS get
       IMPORTING
@@ -154,7 +184,7 @@ CLASS zcl_2ui5_hlp_utility DEFINITION
       RETURNING
         VALUE(r_result) TYPE string.
 
-     CLASS-METHODS get_uuid_session
+    CLASS-METHODS get_uuid_session
       RETURNING
         VALUE(r_result) TYPE string.
 
@@ -190,8 +220,10 @@ CLASS zcl_2ui5_hlp_utility DEFINITION
     CLASS-METHODS trans_xml_2_object
       IMPORTING
         xml           TYPE clike
+      EXPORTING
+        data          TYPE data
       RETURNING
-        VALUE(result) TYPE REF TO if_serializable_object.
+        VALUE(result) TYPE REF TO data. "if_serializable_object.
 
     CLASS-METHODS trans_xml_2_any_multi
       IMPORTING
@@ -211,9 +243,17 @@ CLASS zcl_2ui5_hlp_utility DEFINITION
       RETURNING
         VALUE(result) TYPE string.
 
+
+
+    CLASS-METHODS hlp_get_t_attri
+      IMPORTING
+        VALUE(io_app)   TYPE REF TO object
+      RETURNING
+        VALUE(r_result) TYPE ty-t-attri.
+
     CLASS-METHODS trans_object_2_xml
       IMPORTING
-        object        TYPE REF TO if_serializable_object
+        object        TYPE data
       RETURNING
         VALUE(result) TYPE string.
 
@@ -332,6 +372,34 @@ CLASS zcl_2ui5_hlp_utility DEFINITION
         iv_data  TYPE string.
 
     CLASS-METHODS http_db_log.
+    CLASS-METHODS get_params_by_url
+      IMPORTING
+        VALUE(url)      TYPE string
+        VALUE(name)     TYPE string
+      RETURNING
+        VALUE(r_result) TYPE string.
+    CLASS-METHODS get_prev_when_no_handler
+      IMPORTING
+        val             TYPE REF TO cx_root
+      RETURNING
+        VALUE(r_result) TYPE REF TO cx_root.
+    CLASS-METHODS get_abap_2_json
+      IMPORTING
+        val             TYPE any
+      RETURNING
+        VALUE(r_result) TYPE string.
+    CLASS-METHODS trans_ref_tab_2_tab
+      IMPORTING
+        ir_tab_from TYPE REF TO data
+        ir_tab_to   TYPE REF TO data.
+    CLASS-METHODS _get_t_attri
+      IMPORTING
+        io_app          TYPE REF TO object
+        ir_attri        TYPE string "REF TO abap_attrdescr
+      RETURNING
+        VALUE(r_result) TYPE abap_attrdescr_tab.
+    "" ct_attri TYPE abap_attrdescr_tab
+    " ct_tmp   TYPE abap_attrdescr_tab.
 *      IMPORTING
 *        is_db TYPE zstc77_t_001.
   PRIVATE SECTION.
@@ -342,6 +410,68 @@ ENDCLASS.
 
 
 CLASS zcl_2ui5_hlp_utility IMPLEMENTATION.
+
+  METHOD trans_ref_tab_2_tab.
+
+    FIELD-SYMBOLS <tab> TYPE STANDARD TABLE.
+    FIELD-SYMBOLS <tab_ui5> TYPE STANDARD TABLE.
+    FIELD-SYMBOLS <fs_comp> TYPE data.
+    FIELD-SYMBOLS <fs_comp_ui5> TYPE data.
+    " DATA lr_tab_ui5 TYPE REF TO data.
+    DATA lr_tab_back TYPE REF TO data.
+    DATA lr_tab_ui5_row TYPE REF TO data.
+    "  DATA(lr_tab) = REF #( io_obj->(ir_attri->name) ).
+    ASSIGN ir_tab_to->* TO <tab>.
+    " DATA(lv_name) = ir_attri->name.
+    "lr_tab_ui5 = mo_body->get_attribute( lv_name )->mr_actual.
+    ASSIGN ir_tab_from->* TO <tab_ui5>.
+    " <tab>.
+
+    "  DATA(lv_test) = mo_body->get_attribute( lv_name )->write_result( ). "write( ).
+
+    LOOP AT <tab> REFERENCE INTO lr_tab_back.
+      DATA(lv_tabix) = sy-tabix.
+
+      lr_tab_ui5_row = <tab_ui5>[ lv_tabix ].
+
+      DATA(lv_int) = 0.
+      DO.
+        lv_int += 1.
+        ASSIGN COMPONENT lv_int OF STRUCTURE lr_tab_back->* TO <fs_comp>.
+        IF sy-subrc NE 0.
+          EXIT.
+        ENDIF.
+        ASSIGN COMPONENT lv_int OF STRUCTURE lr_tab_ui5_row->* TO <fs_comp_ui5>.
+        <fs_comp> = <fs_comp_ui5>->*.
+      ENDDO.
+
+    ENDLOOP.
+
+  ENDMETHOD.
+
+
+  METHOD x_get_kind.
+
+    r_result = ms_error-kind.
+
+  ENDMETHOD.
+
+
+  METHOD get_params_by_url.
+
+    url = to_upper( url ).
+    name = to_upper( name ).
+    SPLIT url AT `?` INTO DATA(dummy) url.
+    SPLIT url AT `&` INTO TABLE DATA(lt_href).
+    DATA(lt_url_params) = VALUE if_web_http_request=>name_value_pairs(  ).
+    LOOP AT lt_href REFERENCE INTO DATA(lr_href).
+      SPLIT lr_href->* AT `=` INTO TABLE DATA(lt_param).
+      INSERT VALUE #( name = to_upper( lt_param[ 1 ] ) value = to_upper( lt_param[ 2 ] ) ) INTO TABLE lt_url_params.
+    ENDLOOP.
+
+    r_result = lt_url_params[ name = name ]-value.
+
+  ENDMETHOD.
 
 
   METHOD http_db_log.
@@ -526,16 +656,15 @@ CLASS zcl_2ui5_hlp_utility IMPLEMENTATION.
 
     CALL TRANSFORMATION id
        SOURCE XML xml
-       RESULT data = result.
+       RESULT data = data.
 
   ENDMETHOD.
 
 
   METHOD trans_object_2_xml.
 
-
     CALL TRANSFORMATION id
-       SOURCE data = object "i_result->ms_db-data
+       SOURCE data = object->* "i_result->ms_db-data
        RESULT XML result
         OPTIONS data_refs = 'heap-or-create'.
     "i_result->mi_object.
@@ -770,14 +899,19 @@ CLASS zcl_2ui5_hlp_utility IMPLEMENTATION.
     ENDIF.
 
 
-    ms_error-s_msg = msg( val ).
-    "text  = txt.
-
-
-    TRY.
+    CASE TYPE OF cl_abap_typedescr=>describe_by_data( val ).
+      WHEN TYPE cl_abap_refdescr.
         ms_error-x_root ?= val.
-      CATCH cx_root.
-    ENDTRY.
+      WHEN OTHERS.
+        ms_error-s_msg-message = val.
+    ENDCASE.
+
+
+    " msg( val ).
+    "text  = txt.
+    ms_error-kind = kind.
+
+
 
     TRY.
         ms_error-uuid = cl_system_uuid=>create_uuid_c32_static( ).
@@ -986,7 +1120,6 @@ CLASS zcl_2ui5_hlp_utility IMPLEMENTATION.
 
     lv_string = 'A'.
 
-    DATA lt_stringtab TYPE string_table.
 
 *https://de.wikipedia.org/wiki/Base64
 *Phase   Daten   Anmerkungen
@@ -1120,15 +1253,15 @@ CLASS zcl_2ui5_hlp_utility IMPLEMENTATION.
 
   METHOD get_uuid.
 
-   r_result = cl_system_uuid=>create_uuid_c32_static( ).
+    r_result = cl_system_uuid=>create_uuid_c32_static( ).
 
   ENDMETHOD.
 
 
   METHOD get_classname_by_ref.
 
-   DATA(lv_classname) = cl_abap_classdescr=>get_class_name( in ).
-    lv_classname = shift_left( val = lv_classname sub = '\CLASS=' ).
+    DATA(lv_classname) = cl_abap_classdescr=>get_class_name( in ).
+    r_result = substring_after( val = lv_classname sub = '\CLASS=' ).
 
   ENDMETHOD.
 
@@ -1136,8 +1269,142 @@ CLASS zcl_2ui5_hlp_utility IMPLEMENTATION.
   METHOD get_uuid_session.
 
     mv_counter += 1.
-    r_result = shift_left( shift_right( conv string( mv_counter ) ) ).
+    r_result = shift_left( shift_right( CONV string( mv_counter ) ) ).
 
+  ENDMETHOD.
+
+
+  METHOD hlp_get_t_attri.
+
+    io_app = CAST object( io_app ).
+
+    DATA(lo_descr) = CAST cl_abap_classdescr( cl_abap_objectdescr=>describe_by_object_ref(
+          p_object_ref         = io_app
+          ) ).
+
+    DATA(rt_attri)  = lo_descr->attributes.
+
+    DATA(rt_tmp) = VALUE abap_attrdescr_tab( ).
+
+    DELETE rt_attri WHERE visibility <> cl_abap_classdescr=>public.
+
+    LOOP AT rt_attri REFERENCE INTO DATA(lr_attri).
+
+      CASE lr_attri->type_kind.
+
+        WHEN cl_abap_classdescr=>typekind_struct2.
+
+          DATA(lt_attri_tmp) =  _get_t_attri(
+              io_app = io_app
+              ir_attri = CONV #( lr_attri->name )
+               ).
+
+          DELETE rt_attri.
+          INSERT LINES OF lt_attri_tmp INTO TABLE rt_attri.
+
+      ENDCASE.
+
+    ENDLOOP.
+
+
+    LOOP AT rt_attri REFERENCE INTO lr_attri.
+
+      INSERT VALUE #(
+       name = lr_attri->name
+       kind = lr_attri->type_kind
+      ) INTO TABLE r_result.
+
+    ENDLOOP.
+
+  ENDMETHOD.
+
+
+  METHOD get_abap_2_json.
+
+    r_result = val.
+
+    DATA(lo_ele) = CAST cl_abap_elemdescr( cl_abap_elemdescr=>describe_by_data( val ) ).
+    IF lo_ele->get_relative_name( ) = 'ABAP_BOOL'.
+      r_result = COND #(  WHEN val = abap_true THEN 'true' ELSE 'false' ).
+    ENDIF.
+
+  ENDMETHOD.
+
+
+  METHOD get_prev_when_no_handler.
+
+    CASE TYPE OF val.
+      WHEN TYPE cx_sy_no_handler INTO DATA(lx_no_handler).
+        r_result = lx_no_handler->previous.
+    ENDCASE.
+
+    IF r_result IS NOT BOUND.
+      r_result = val.
+    ENDIF.
+
+  ENDMETHOD.
+
+  METHOD get_xml_by_control.
+
+    r_result = |{ r_result } <{ COND #( WHEN ms_control-ns <> '' THEN |{ ms_control-ns }:| ) }{ ms_control-name } \n {
+                         REDUCE #( INIT val = `` FOR row IN ms_control-t_property
+                          NEXT val = |{ val } { row-n }="{
+                                COND #( WHEN row-name IS NOT INITIAL " IS BOUND
+                                             THEN row-name "`{/oUpdate/` && row-name && `}`
+                                             ELSE row-v ) }" \n | ) }|.
+    IF ms_control-t_child IS INITIAL.
+      r_result &&= '/>'.
+      RETURN.
+    ENDIF.
+
+    r_result &&= '>'.
+
+    LOOP AT ms_control-t_child INTO DATA(lr_child).
+      "data(ls_child)
+      r_result &&= get_xml_by_control( lr_child->* ).
+
+    ENDLOOP.
+
+    r_result &&= |</{ COND #( WHEN ms_control-ns <> '' THEN |{ ms_control-ns }:| ) }{ ms_control-name }>|.
+
+
+  ENDMETHOD.
+
+
+  METHOD _get_t_attri.
+
+    DATA(lr_assign_struct) = REF #( io_app->(ir_attri) ).
+
+    DATA(lo_struct) = CAST cl_abap_structdescr( cl_abap_structdescr=>describe_by_data( lr_assign_struct->* ) ).
+    DATA(lt_comp2) = lo_struct->get_components( ).
+
+    LOOP AT lt_comp2 REFERENCE INTO DATA(lr_comp).
+      DATA(lv_element) = ir_attri.
+      lv_element &&= '-' && lr_comp->name.
+
+      DATA(lr_value) = REF #( io_app->(lv_element) ).
+
+      TRY.
+          lo_struct = CAST cl_abap_structdescr( cl_abap_structdescr=>describe_by_data( lr_value->* ) ).
+          data(lt_comp3) = lo_struct->get_components( ).
+
+          LOOP AT lt_comp3 REFERENCE INTO data(lr_comp2).
+
+            DATA(lt_tmp) =  _get_t_attri(
+                  io_app   = io_app
+                  ir_attri = lr_comp2->name
+              ).
+
+            INSERT LINES OF lt_tmp INTO TABLE r_result.
+          ENDLOOP.
+        CATCH cx_root.
+          INSERT VALUE #(
+            name = lv_element
+            type_kind = lr_comp->type->type_kind
+             ) INTO TABLE r_result.
+      ENDTRY.
+
+    ENDLOOP.
   ENDMETHOD.
 
 ENDCLASS.

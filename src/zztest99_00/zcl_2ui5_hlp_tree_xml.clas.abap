@@ -66,7 +66,7 @@ ENDCLASS.
 
 
 
-CLASS zcl_2ui5_hlp_tree_xml IMPLEMENTATION.
+CLASS ZCL_2UI5_HLP_TREE_XML IMPLEMENTATION.
 
 
   METHOD _writer_insert_element.

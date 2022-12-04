@@ -57,6 +57,13 @@ CLASS zcl_2ui5_hlp_tree_json DEFINITION
     METHODS get_parent
       RETURNING
         VALUE(r_result) TYPE ty_o_me.
+
+    METHODS add_list_val
+      IMPORTING
+        v               TYPE string
+      RETURNING
+        VALUE(r_result) TYPE  ty_o_me.
+
     METHODS add_attribute
       IMPORTING
         n               TYPE clike
@@ -64,6 +71,7 @@ CLASS zcl_2ui5_hlp_tree_json DEFINITION
         apos_active     TYPE abap_bool DEFAULT abap_true
       RETURNING
         VALUE(r_result) TYPE  ty_o_me.
+
     METHODS add_attributes_name_value_tab
       IMPORTING
         it_name_value   TYPE ty_T_name_value
@@ -75,6 +83,9 @@ CLASS zcl_2ui5_hlp_tree_json DEFINITION
       RETURNING
         VALUE(r_result) TYPE  ty_o_me.
     METHODS add_list_object
+      RETURNING
+        VALUE(r_result) TYPE  ty_o_me.
+    METHODS add_list_list
       RETURNING
         VALUE(r_result) TYPE  ty_o_me.
     METHODS add_attribute_list
@@ -145,7 +156,18 @@ CLASS zcl_2ui5_hlp_tree_json IMPLEMENTATION.
     lo_attri->mo_root = mo_root.
     lo_attri->mv_name = name.
 
-    lo_attri->mr_actual = mr_actual->(name).
+   " DATA(lv_test) = name.
+    data(lv_test) = replace( val = name sub = '-' with = '_' occ = 0 ).
+   " REPLACE all OCCURRENCES OF '-' IN lv_test WITH '_'.
+    lo_attri->mr_actual = mr_actual->(lv_test).
+
+*    TRY.
+*        lo_attri->mr_actual = mr_actual->(name).
+*      CATCH cx_root.
+*        DATA(lv_test) = name.
+*        REPLACE '-' IN lv_test WITH '_'.
+*        lo_attri->mr_actual = mr_actual->(lv_test).
+*    ENDTRY.
 
     " try.
     " lo_attri->mv_value = conv string( lo_attri->mr_actual->* ).
@@ -185,6 +207,28 @@ CLASS zcl_2ui5_hlp_tree_json IMPLEMENTATION.
   ENDMETHOD.
 
 
+  METHOD add_list_val.
+
+    DATA(lo_attri) = NEW zcl_2ui5_hlp_tree_json(  ).
+    lo_attri->mv_name =  CONV string( lines( mt_values ) ).
+    lo_attri->mv_value = v.
+
+    lo_attri->mv_apost_active = abap_true.
+    "apostrophe_active.
+
+    mt_values = VALUE #( BASE mt_values ( lo_attri ) ).
+    " INSERT lo_attri INTO TABLE mt_values.
+
+    lo_attri->mo_root = mo_root.
+    lo_attri->mo_parent = me.
+
+    r_result = lo_attri.
+
+    r_result = me.
+
+  ENDMETHOD.
+
+
   METHOD add_attribute.
 
 
@@ -214,9 +258,9 @@ CLASS zcl_2ui5_hlp_tree_json IMPLEMENTATION.
 
     r_result &&= COND #( WHEN mv_check_list = abaP_true THEN `[` ELSE `{` ).
 
-  "  IF mv_check_attr_all_read = abap_false.
-   "   get_attribute_all( ).
-   " ENDIF.
+    "  IF mv_check_attr_all_read = abap_false.
+    "   get_attribute_all( ).
+    " ENDIF.
 
     LOOP AT mt_values INTO DATA(lo_attri).
       DATA(lv_index) = sy-tabix.
@@ -261,6 +305,15 @@ CLASS zcl_2ui5_hlp_tree_json IMPLEMENTATION.
 
 
     r_result = add_attribute_object( name =  CONV string( lines( mt_values ) ) ).
+
+
+  ENDMETHOD.
+
+
+  METHOD add_list_list.
+
+
+    r_result = add_attribute_list( name =  CONV string( lines( mt_values ) ) ).
 
 
   ENDMETHOD.
