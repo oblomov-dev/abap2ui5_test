@@ -1,4 +1,4 @@
-class ZCL_2UI5_HTTP_CLOUD definition
+class Z2UI5_cl_HTTP_CLOUD definition
   public
   create public .
 
@@ -11,7 +11,7 @@ ENDCLASS.
 
 
 
-CLASS ZCL_2UI5_HTTP_CLOUD IMPLEMENTATION.
+CLASS Z2UI5_cl_HTTP_CLOUD IMPLEMENTATION.
 
   METHOD if_http_service_extension~handle_request.
 
